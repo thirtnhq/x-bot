@@ -19,7 +19,8 @@ interface CategoryTabsProps {
 
 export const TABS: Tab[] = [
   { id: 'all_urls', label: 'All Submissions', emoji: '🔍' },
-  { id: 'top8', label: 'Top 15 Overall', emoji: '🏆' },
+  { id: 'top8', label: 'Full Rankings', emoji: '🏆' },
+
 
   { id: 'threads', label: 'Best Threads', emoji: '🧵' },
   { id: 'singleTweets', label: 'Best Single Tweets', emoji: '🐦' },
