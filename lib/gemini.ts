@@ -53,20 +53,20 @@ Return ONLY a valid JSON object with the following structure:
 
     // Replicate's Gemini 3.1 Pro model
     const output: any = await replicate.run(
-      "google/gemini-3.1-pro",
+      "anthropic/claude-4-sonnet",
       { input }
     );
 
     // Replicate output for Gemini usually comes as an array of strings (parts of the response)
     const text = Array.isArray(output) ? output.join('') : (output?.toString() || "");
-    
+
     // Log for debugging (only first 100 chars and last 100 chars if long)
     console.log(`Replicate Raw Output Preview: ${text.substring(0, 100)}...${text.substring(text.length - 100)}`);
 
     // More robust extraction: find the first { and the last }
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) throw new Error("No JSON object found in AI response");
-    
+
     const cleaned = match[0].trim();
     let parsed: any;
     try {
@@ -77,11 +77,11 @@ Return ONLY a valid JSON object with the following structure:
     }
 
 
-    
+
     // Calculate 0-100 weighted score
     const overall = Math.round(
-      (parsed.creativity * 3.5) + 
-      (parsed.clarity * 3.5) + 
+      (parsed.creativity * 3.5) +
+      (parsed.clarity * 3.5) +
       (parsed.engagement * 3.0)
     );
 

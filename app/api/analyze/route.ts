@@ -108,14 +108,15 @@ export async function GET() {
         const threads = validSubs.filter(s => s.category === 'thread');
         const singleTweets = validSubs.filter(s => s.category === 'single_tweet');
         const memesVisuals = validSubs.filter(s => s.category === 'meme_visual');
-        const top15 = validSubs.slice(0, 15);
+        // All scored submissions ranked — no cap
+        const allRanked = validSubs;
 
         const finalResult: any = {
           threads,
           singleTweets,
           memesVisuals,
-          top8: top15,   // keep key for backward-compat with firebase / results page
-          top15,
+          top8: allRanked,   // all scored, ranked
+          top15: allRanked,
           allSubmissions: processedSubs,
           analyzedAt: new Date().toISOString(),
           totalSubmissions,
