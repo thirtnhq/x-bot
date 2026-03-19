@@ -1,33 +1,41 @@
 import { NextResponse } from 'next/server';
-import { fetchBoundlessSubmissions } from '@/lib/boundless';
-import { fetchTweet, fetchThread } from '@/lib/twitter';
 import { scoreSubmission } from '@/lib/gemini';
 import { calculateEngagementScore, calculateFinalScore } from '@/lib/scorer';
-import { SubmissionData, TweetData, Category, AIScores } from '@/lib/types';
+import { SubmissionData, Category, ScoreSnapshot } from '@/lib/types';
 
 export const maxDuration = 300; // Allow Vercel functions to run for up to 5 mins
 export const dynamic = 'force-dynamic';
+
+/** Prize pool in order 1st → 8th (USDC) */
+const PRIZE_POOL: string[] = [
+  '50 USDC',
+  '35 USDC',
+  '25 USDC',
+  '20 USDC',
+  '19 USDC',
+  '18 USDC',
+  '17 USDC',
+  '16 USDC',
+];
 
 export async function GET() {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const sendUpdate = (data: any) => {
+      const sendUpdate = (data: unknown) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       };
 
-      let items: any[] = [];
-      let fullRawPayload: any = null; // Store full unmodified payload
       try {
         const { getRawSubmissions, saveAnalysis } = await import('@/lib/firebase');
-        
+
         sendUpdate({ type: 'progress', message: 'Loading submissions from Firebase cache...' });
         const cachedSubmissions = await getRawSubmissions();
-        
+
         if (!cachedSubmissions || cachedSubmissions.length === 0) {
-          sendUpdate({ 
-            type: 'error', 
-            message: 'No submissions found in cache. Please click "Sync Data" first to fetch from X.' 
+          sendUpdate({
+            type: 'error',
+            message: 'No submissions found in cache. Please click "Sync Data" first to fetch from X.',
           });
           controller.close();
           return;
@@ -40,10 +48,10 @@ export async function GET() {
         const processedSubs: SubmissionData[] = [];
 
         for (let i = 0; i < cachedSubmissions.length; i++) {
-          const sub = { ...cachedSubmissions[i] };
-          sendUpdate({ 
-            type: 'progress', 
-            message: `Analyzing submission ${i + 1}/${totalSubmissions}: ${sub.xHandle}...` 
+          const sub: SubmissionData = { ...cachedSubmissions[i] };
+          sendUpdate({
+            type: 'progress',
+            message: `Analyzing submission ${i + 1}/${totalSubmissions}: ${sub.xHandle}...`,
           });
 
           try {
@@ -55,76 +63,112 @@ export async function GET() {
               continue;
             }
 
-            // 1. Categorize (if not already)
-            let category: Category = sub.category || 'single_tweet';
-            if (threadTweets.length > 0) {
+            // 1. Categorize — follows hackathon rules:
+            //    thread      = 2+ connected tweets (main + at least 1 thread reply)
+            //    meme_visual = single tweet that contains image or video (no thread)
+            //    single_tweet = default (text-only or profile-only)
+            let category: Category;
+            const hasThread = threadTweets.length >= 1; // 1+ replies = 2 total tweets
+            if (hasThread) {
               category = 'thread';
-            } else if (mainTweet.hasMedia) {
+            } else if (mainTweet.hasMedia && mainTweet.mediaUrls.length > 0) {
               category = 'meme_visual';
+            } else {
+              category = sub.category || 'single_tweet';
             }
             sub.category = category;
 
-            // 2. Calculate Engagement Score
-            let totalMetrics = { ...mainTweet.metrics };
+            // 2. Aggregate engagement metrics (sum across thread tweets too)
+            const totalMetrics = { ...mainTweet.metrics };
             if (category === 'thread' && threadTweets.length > 0) {
-                for (const t of threadTweets) {
-                    totalMetrics.retweets += (t.metrics?.retweets || 0);
-                    totalMetrics.quotes += (t.metrics?.quotes || 0);
-                    totalMetrics.bookmarks += (t.metrics?.bookmarks || 0);
-                    totalMetrics.replies += (t.metrics?.replies || 0);
-                    totalMetrics.likes += (t.metrics?.likes || 0);
-                    totalMetrics.impressions += (t.metrics?.impressions || 0);
-                }
+              for (const t of threadTweets) {
+                totalMetrics.retweets    += (t.metrics?.retweets    || 0);
+                totalMetrics.quotes      += (t.metrics?.quotes      || 0);
+                totalMetrics.bookmarks   += (t.metrics?.bookmarks   || 0);
+                totalMetrics.replies     += (t.metrics?.replies     || 0);
+                totalMetrics.likes       += (t.metrics?.likes       || 0);
+                totalMetrics.impressions += (t.metrics?.impressions || 0);
+              }
             }
-            
             sub.engagementScore = calculateEngagementScore(totalMetrics);
 
-            // 3. AI Scoring with Replicate/Gemini
-            sendUpdate({ 
-              type: 'progress', 
-              message: `Scoring submission ${i + 1}/${totalSubmissions} with AI...` 
+            // 3. AI Scoring
+            sendUpdate({
+              type: 'progress',
+              message: `Scoring submission ${i + 1}/${totalSubmissions} with AI...`,
             });
             const aiScores = await scoreSubmission(category, mainTweet, threadTweets);
             sub.aiScores = aiScores;
 
-            // 4. Final Score Calculation
+            // 4. Final Score (65% AI overall + 35% real engagement)
             sub.finalScore = calculateFinalScore(aiScores, sub.engagementScore);
-            
+
             processedSubs.push(sub);
             successfullyAnalyzed++;
-
-          } catch (err: any) {
+          } catch (err: unknown) {
             console.error(`Error processing submission ${sub.id}:`, err);
             processedSubs.push(sub);
           }
         }
 
-        sendUpdate({ type: 'progress', message: 'Finalizing results...' });
+        sendUpdate({ type: 'progress', message: 'Finalizing results and assigning prizes...' });
 
-        // Sort and filter results
+        // ── Ranking & prize assignment ──────────────────────────────────────────
         const validSubs = processedSubs.filter(s => s.finalScore !== undefined);
-        validSubs.sort((a, b) => (b.finalScore || 0) - (a.finalScore || 0));
+        validSubs.sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
 
-        const threads = validSubs.filter(s => s.category === 'thread');
+        // Assign stable rank, prize, and full score snapshot to every scored submission
+        validSubs.forEach((sub, idx) => {
+          sub.rank = idx + 1;
+          if (idx < PRIZE_POOL.length) {
+            sub.prize = PRIZE_POOL[idx];
+          }
+          // Record the complete score breakdown for this submission
+          if (sub.aiScores && sub.engagementScore !== undefined && sub.finalScore !== undefined) {
+            const snapshot: ScoreSnapshot = {
+              creativity:          sub.aiScores.creativity,
+              clarity:             sub.aiScores.clarity,
+              engagementPotential: sub.aiScores.engagement,
+              aiOverall:           sub.aiScores.overall,
+              realEngagement:      sub.engagementScore,
+              finalScore:          sub.finalScore,
+            };
+            sub.scoreSnapshot = snapshot;
+          }
+        });
+
+        // Top-8 prize winners (might be fewer if not enough valid subs)
+        const prizeWinners = validSubs.slice(0, PRIZE_POOL.length);
+
+        // Category splits (all scored, not capped)
+        const threads      = validSubs.filter(s => s.category === 'thread');
         const singleTweets = validSubs.filter(s => s.category === 'single_tweet');
         const memesVisuals = validSubs.filter(s => s.category === 'meme_visual');
-        // All scored submissions ranked — no cap
-        const allRanked = validSubs;
 
-        const finalResult: any = {
+        const finalResult: {
+          threads: SubmissionData[];
+          singleTweets: SubmissionData[];
+          memesVisuals: SubmissionData[];
+          prizeWinners: SubmissionData[];
+          allRanked: SubmissionData[];
+          allSubmissions: SubmissionData[];
+          analyzedAt: string;
+          totalSubmissions: number;
+          successfullyAnalyzed: number;
+          id?: string;
+        } = {
           threads,
           singleTweets,
           memesVisuals,
-          top8: allRanked,   // all scored, ranked
-          top15: allRanked,
+          prizeWinners,           // top 8 with rank + prize + scoreSnapshot
+          allRanked: validSubs,   // all scored, sorted descending
           allSubmissions: processedSubs,
           analyzedAt: new Date().toISOString(),
           totalSubmissions,
-          successfullyAnalyzed
+          successfullyAnalyzed,
         };
 
-
-        // Save to Firebase for persistence
+        // Persist to Firebase
         if (process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
           try {
             const analysisId = await saveAnalysis(finalResult);
@@ -136,13 +180,13 @@ export async function GET() {
 
         sendUpdate({ type: 'complete', data: finalResult });
         controller.close();
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Analysis failed. Please check the server logs.';
         console.error('Analysis failed:', error);
-        sendUpdate({ type: 'error', message: error.message || 'Analysis failed. Please check the server logs.' });
+        sendUpdate({ type: 'error', message });
         controller.close();
       }
-
-    }
+    },
   });
 
   return new NextResponse(stream, {
@@ -154,6 +198,3 @@ export async function GET() {
   });
 }
 
-function isThreadCategory(cat: Category): cat is 'thread' {
-    return cat === 'thread';
-}
