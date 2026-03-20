@@ -13,14 +13,16 @@ interface AnalysisResult {
   threads: SubmissionData[];
   singleTweets: SubmissionData[];
   memesVisuals: SubmissionData[];
-  top8: SubmissionData[];
-  top15: SubmissionData[];
+  /** Top 15 with rank, prize, and scoreSnapshot */
+  prizeWinners: SubmissionData[];
+  /** All scored submissions sorted by finalScore */
+  allRanked: SubmissionData[];
   allSubmissions: SubmissionData[];
   analyzedAt: string;
   totalSubmissions: number;
   successfullyAnalyzed: number;
-  rawSubmissions?: any[];
-  fullRawPayload?: any;
+  rawSubmissions?: SubmissionData[];
+  fullRawPayload?: Record<string, unknown>;
 }
 
 
@@ -31,7 +33,7 @@ export default function Home() {
   const [progress, setProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<AnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<TabId>('top8');
+  const [activeTab, setActiveTab] = useState<TabId>('prizeWinners');
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<string>('');
@@ -107,8 +109,8 @@ export default function Home() {
       }
       setIsSyncing(false);
       return true; // Success
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during sync');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred during sync');
       setIsSyncing(false);
       return false; // Failed
     }
@@ -179,8 +181,8 @@ export default function Home() {
           }
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during analysis');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred during analysis');
       setIsAnalyzing(false);
     }
   };
@@ -194,11 +196,11 @@ export default function Home() {
   const getActiveData = (): SubmissionData[] => {
     if (!results) return [];
     switch (activeTab) {
-      case 'all_urls': return results.allSubmissions;
-      case 'top8': return results.top15 || results.top8;
-      case 'threads': return results.threads;
-      case 'singleTweets': return results.singleTweets;
-      case 'memesVisuals': return results.memesVisuals;
+      case 'all_urls':      return results.allSubmissions   ?? [];
+      case 'prizeWinners':  return results.prizeWinners     ?? [];
+      case 'threads':       return results.threads          ?? [];
+      case 'singleTweets':  return results.singleTweets     ?? [];
+      case 'memesVisuals':  return results.memesVisuals     ?? [];
       default: return [];
     }
   };
@@ -207,11 +209,11 @@ export default function Home() {
   const getCounts = () => {
     if (!results) return undefined;
     return {
-      all_urls: results.allSubmissions.length,
-      top8: (results.top15 || results.top8)?.length ?? 0,
-      threads: results.threads.length,
-      singleTweets: results.singleTweets.length,
-      memesVisuals: results.memesVisuals.length,
+      all_urls:      results.allSubmissions.length,
+      prizeWinners:  results.prizeWinners?.length ?? 0,
+      threads:       results.threads.length,
+      singleTweets:  results.singleTweets.length,
+      memesVisuals:  results.memesVisuals.length,
     };
   };
 

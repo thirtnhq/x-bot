@@ -30,6 +30,16 @@ export interface TweetData {
   isThread: boolean;
 }
 
+/** Full score breakdown recorded for each winner */
+export interface ScoreSnapshot {
+  creativity: number;       // AI: 0–10 (35% weight)
+  clarity: number;          // AI: 0–10 (35% weight)
+  engagementPotential: number; // AI: 0–10 (30% weight)
+  aiOverall: number;        // Weighted AI total: 0–100
+  realEngagement: number;   // Twitter metric score: 0–100
+  finalScore: number;       // 65% aiOverall + 35% realEngagement: 0–100
+}
+
 export interface SubmissionData {
   id: string;
   submittedBy: string;
@@ -38,13 +48,19 @@ export interface SubmissionData {
   tweetId?: string;
   isProfile?: boolean;
 
-
   tweetData?: TweetData;
-  threadTweets?: TweetData[]; 
+  threadTweets?: TweetData[];
   category?: Category;
   aiScores?: AIScores;
   engagementScore?: number;
   finalScore?: number;
+
+  /** Assigned after final ranking */
+  rank?: number;
+  /** Prize label e.g. "50 USDC" */
+  prize?: string;
+  /** Full score breakdown snapshot recorded for all prize winners */
+  scoreSnapshot?: ScoreSnapshot;
 }
 
 
@@ -53,13 +69,16 @@ export interface AnalysisResult {
   threads: SubmissionData[];
   singleTweets: SubmissionData[];
   memesVisuals: SubmissionData[];
-  top8: SubmissionData[];
+  /** Top 15 prize winners with rank, prize, and scoreSnapshot assigned */
+  prizeWinners: SubmissionData[];
+  /** All scored submissions, sorted by finalScore descending */
+  allRanked: SubmissionData[];
   allSubmissions: SubmissionData[];
   analyzedAt: string;
   totalSubmissions: number;
   successfullyAnalyzed: number;
-  rawSubmissions?: any[];
-  fullRawPayload?: any;
+  rawSubmissions?: SubmissionData[];
+  fullRawPayload?: Record<string, unknown>;
 }
 
 

@@ -1,7 +1,6 @@
 import { cn } from '@/lib/utils';
-import { Search } from 'lucide-react';
 
-export type TabId = 'top8' | 'threads' | 'singleTweets' | 'memesVisuals' | 'all_urls';
+export type TabId = 'prizeWinners' | 'threads' | 'singleTweets' | 'memesVisuals' | 'all_urls';
 
 interface Tab {
   id: TabId;
@@ -18,14 +17,13 @@ interface CategoryTabsProps {
 }
 
 export const TABS: Tab[] = [
-  { id: 'all_urls', label: 'All Submissions', emoji: '🔍' },
-  { id: 'top8', label: 'Full Rankings', emoji: '🏆' },
-
-
-  { id: 'threads', label: 'Best Threads', emoji: '🧵' },
-  { id: 'singleTweets', label: 'Best Single Tweets', emoji: '🐦' },
+  { id: 'prizeWinners', label: 'Prize Winners', emoji: '🏆' },
+  { id: 'threads',      label: 'Best Threads',        emoji: '🧵' },
+  { id: 'singleTweets', label: 'Best Single Tweets',  emoji: '🐦' },
   { id: 'memesVisuals', label: 'Best Memes & Visuals', emoji: '🎨' },
+  { id: 'all_urls',     label: 'All Submissions',      emoji: '🔍' },
 ];
+
 
 
 export function CategoryTabs({ activeTab, onTabChange, counts, className }: CategoryTabsProps) {
