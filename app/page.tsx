@@ -13,7 +13,7 @@ interface AnalysisResult {
   threads: SubmissionData[];
   singleTweets: SubmissionData[];
   memesVisuals: SubmissionData[];
-  /** Top 8 with rank, prize, and scoreSnapshot */
+  /** Top 15 with rank, prize, and scoreSnapshot */
   prizeWinners: SubmissionData[];
   /** All scored submissions sorted by finalScore */
   allRanked: SubmissionData[];

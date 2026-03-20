@@ -69,7 +69,7 @@ export interface AnalysisResult {
   threads: SubmissionData[];
   singleTweets: SubmissionData[];
   memesVisuals: SubmissionData[];
-  /** Top 8 prize winners with rank, prize, and scoreSnapshot assigned */
+  /** Top 15 prize winners with rank, prize, and scoreSnapshot assigned */
   prizeWinners: SubmissionData[];
   /** All scored submissions, sorted by finalScore descending */
   allRanked: SubmissionData[];

@@ -6,7 +6,7 @@ import { SubmissionData, Category, ScoreSnapshot } from '@/lib/types';
 export const maxDuration = 300; // Allow Vercel functions to run for up to 5 mins
 export const dynamic = 'force-dynamic';
 
-/** Prize pool in order 1st → 8th (USDC) */
+/** Prize pool in order 1st → 15th (USDC) */
 const PRIZE_POOL: string[] = [
   '50 USDC',
   '35 USDC',
@@ -16,6 +16,13 @@ const PRIZE_POOL: string[] = [
   '18 USDC',
   '17 USDC',
   '16 USDC',
+  '10 USDC',
+  '10 USDC',
+  '10 USDC',
+  '10 USDC',
+  '10 USDC',
+  '10 USDC',
+  '10 USDC',
 ];
 
 export async function GET() {
@@ -137,7 +144,7 @@ export async function GET() {
           }
         });
 
-        // Top-8 prize winners (might be fewer if not enough valid subs)
+        // Top-15 prize winners (might be fewer if not enough valid subs)
         const prizeWinners = validSubs.slice(0, PRIZE_POOL.length);
 
         // Category splits (all scored, not capped)
@@ -160,7 +167,7 @@ export async function GET() {
           threads,
           singleTweets,
           memesVisuals,
-          prizeWinners,           // top 8 with rank + prize + scoreSnapshot
+          prizeWinners,           // top 15 with rank + prize + scoreSnapshot
           allRanked: validSubs,   // all scored, sorted descending
           allSubmissions: processedSubs,
           analyzedAt: new Date().toISOString(),
