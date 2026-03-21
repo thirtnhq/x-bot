@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { SubmissionData } from '@/lib/types';
 import { ScoreBar } from './ScoreBar';
-import { ChevronDown, ChevronUp, ExternalLink, MessageCircle, Repeat2, Heart, Bookmark, Trophy } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, MessageCircle, Repeat2, Heart, Bookmark, Trophy, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -27,6 +27,7 @@ function rankMedal(rank?: number): string {
 export function ResultsTable({ data, emptyMessage = 'No submissions found.', categoryName }: ResultsTableProps) {
   const [sortField, setSortField] = useState<SortField>('finalScore');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isPrizeWinners = categoryName === 'Prize Winners';
   const isAllSubmissions = categoryName === 'All Submissions';
@@ -50,10 +51,20 @@ export function ResultsTable({ data, emptyMessage = 'No submissions found.', cat
   // Normalise: guard against undefined/null passed in (e.g. stale cached shape)
   const safeData: SubmissionData[] = Array.isArray(data) ? data : [];
 
+  // Filter by search query (submission name or X handle)
+  const q = searchQuery.trim().toLowerCase();
+  const filteredData = q
+    ? safeData.filter(
+        (row) =>
+          row.submittedBy.toLowerCase().includes(q) ||
+          row.xHandle.toLowerCase().includes(q)
+      )
+    : safeData;
+
   // For prize winners use server-assigned rank order; otherwise sort client-side
   const sortedData = isPrizeWinners
-    ? [...safeData].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999))
-    : [...safeData].sort((a, b) => {
+    ? [...filteredData].sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999))
+    : [...filteredData].sort((a, b) => {
         let valA = 0;
         let valB = 0;
         switch (sortField) {
@@ -120,24 +131,52 @@ export function ResultsTable({ data, emptyMessage = 'No submissions found.', cat
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end gap-4 items-center">
-        {isAllSubmissions && (
-          <span className="text-xs text-gray-500 bg-gray-900/50 px-3 py-2 rounded-lg border border-gray-700/30">
-            Note: Profile-only submissions are listed but skip AI scoring.
-          </span>
-        )}
-        {isPrizeWinners && (
-          <span className="text-xs text-amber-500/80 bg-amber-500/10 px-3 py-2 rounded-lg border border-amber-500/20 flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5" />
-            Rank order is fixed — determined by Final Score
-          </span>
-        )}
-        <button
-          onClick={exportCSV}
-          className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2"
-        >
-          Download CSV
-        </button>
+      <div className="flex flex-wrap justify-between gap-3 items-center">
+        {/* Search bar */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or @handle…"
+            className="w-full pl-9 pr-8 py-2 text-sm bg-gray-900/70 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500/60 focus:border-blue-500/60 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {isAllSubmissions && (
+            <span className="text-xs text-gray-500 bg-gray-900/50 px-3 py-2 rounded-lg border border-gray-700/30">
+              Note: Profile-only submissions are listed but skip AI scoring.
+            </span>
+          )}
+          {isPrizeWinners && (
+            <span className="text-xs text-amber-500/80 bg-amber-500/10 px-3 py-2 rounded-lg border border-amber-500/20 flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5" />
+              Rank order is fixed — determined by Final Score
+            </span>
+          )}
+          {q && (
+            <span className="text-xs text-gray-400">
+              {sortedData.length} result{sortedData.length !== 1 ? 's' : ''}
+            </span>
+          )}
+          <button
+            onClick={exportCSV}
+            className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2"
+          >
+            Download CSV
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-700/50 shadow-xl bg-gray-800/80 backdrop-blur-sm">
@@ -264,7 +303,7 @@ export function ResultsTable({ data, emptyMessage = 'No submissions found.', cat
                           <span className="text-[10px] bg-indigo-900/50 text-indigo-200 px-2 py-0.5 rounded border border-indigo-700/50 cursor-help">
                             AI Reasoning
                           </span>
-                          <div className="absolute left-0 bottom-full mb-2 hidden w-64 p-3 bg-gray-900 border border-gray-600 rounded-lg shadow-xl text-xs text-gray-300 group-hover:block z-50 pointer-events-none">
+                          <div className="absolute left-0 z-100 bottom-full mb-2 hidden w-64 p-3 bg-gray-900 border border-gray-600 rounded-lg shadow-xl text-xs text-gray-300 group-hover:block pointer-events-none">
                             {row.aiScores.reasoning}
                           </div>
                         </div>

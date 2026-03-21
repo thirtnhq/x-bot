@@ -89,7 +89,7 @@ Return ONLY a valid JSON object — no markdown, no surrounding text:
 
     // Replicate — Claude 4 Sonnet
     const output: string[] | string = await replicate.run(
-      "anthropic/claude-4-sonnet",
+      "openai/gpt-5.2",
       { input }
     ) as string[] | string;
 
